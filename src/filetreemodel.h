@@ -41,10 +41,13 @@ public:
     Q_INVOKABLE void setDocument(const QUrl &documentUrl);
     Q_INVOKABLE void setRootPath(const QString &path);
     Q_INVOKABLE void toggle(int row);
+    Q_INVOKABLE void collapseAll();
     Q_INVOKABLE void refresh();
     Q_INVOKABLE QVariantMap entry(int row) const;
     Q_INVOKABLE int rowForUrl(const QUrl &url) const;
     Q_INVOKABLE int parentRow(int row) const;
+    // Whether a document lives under the folder the tree is rooted at.
+    Q_INVOKABLE bool containsDocument(const QUrl &documentUrl) const;
 
 signals:
     void rootPathChanged();

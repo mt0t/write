@@ -285,6 +285,13 @@ private slots:
         tree.toggle(0);
         QCOMPARE(tree.rowCount(), 4);
         QVERIFY(!tree.entry(0).value("expanded").toBool());
+
+        // Back to root closes every folder at once.
+        tree.toggle(0);
+        QCOMPARE(tree.rowCount(), 7);
+        tree.collapseAll();
+        QCOMPARE(tree.rowCount(), 4);
+        QVERIFY(!tree.entry(0).value("expanded").toBool());
     }
 
     void rootsTheTreeAtTheOpenDocument() {
@@ -292,14 +299,25 @@ private slots:
         QVERIFY(directory.isValid());
         const QDir root(directory.path());
         QVERIFY(root.mkdir("writing"));
+        QVERIFY(root.mkdir("writing/archive"));
         const QString document = root.filePath("writing/note.md");
         writeFile(document, "# note");
 
         FileTreeModel tree;
         tree.setDocument(QUrl::fromLocalFile(document));
         QCOMPARE(tree.rootPath(), QFileInfo(document).absolutePath());
-        QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(document)), 0);
+        // The folder the document sits beside comes first.
+        QCOMPARE(tree.entry(0).value("name").toString(), QStringLiteral("archive"));
+        QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(document)), 1);
         QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(root.filePath("writing/missing.md"))), -1);
+
+        // Documents under the root keep it, however deep they sit.
+        QVERIFY(tree.containsDocument(QUrl::fromLocalFile(document)));
+        QVERIFY(tree.containsDocument(QUrl::fromLocalFile(root.filePath("writing/archive/old.md"))));
+        // An unsaved document has no folder to move the tree to.
+        QVERIFY(tree.containsDocument(QUrl()));
+        // One from another folder does not.
+        QVERIFY(!tree.containsDocument(QUrl::fromLocalFile(root.filePath("elsewhere/note.md"))));
     }
 
     void togglesTheFileTreeWithItsShortcut() {
@@ -341,6 +359,22 @@ private slots:
         QCOMPARE(tree->rowCount(), 3);
         QCOMPARE(tree->entry(0).value("name").toString(), QStringLiteral("notes"));
         QCOMPARE(tree->rowForUrl(QUrl::fromLocalFile(root.filePath("note.md"))), 1);
+
+        // Choosing a file in a subfolder leaves the tree rooted where it was,
+        // and open, so the root is still one look away.
+        tree->toggle(0);
+        QCOMPARE(tree->rowCount(), 4);
+        const QUrl inner = QUrl::fromLocalFile(root.filePath("notes/inner.md"));
+        QVERIFY(QMetaObject::invokeMethod(panel, "fileActivated", Q_ARG(QUrl, inner)));
+        QCOMPARE(backend.fileUrl(), inner);
+        QVERIFY(panel->property("visible").toBool());
+        QCOMPARE(tree->rootPath(), root.absolutePath());
+        QCOMPARE(tree->rowForUrl(inner), 1);
+
+        // Back to root closes the folder and puts the first row back on top.
+        QVERIFY(QMetaObject::invokeMethod(panel, "backToRoot"));
+        QCOMPARE(tree->rowCount(), 3);
+        QVERIFY(!tree->entry(0).value("expanded").toBool());
 
         QTest::keyClick(window, Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
         QVERIFY(!panel->property("visible").toBool());

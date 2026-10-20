@@ -100,15 +100,17 @@ ApplicationWindow {
             : Window.FullScreen;
     }
 
-    // The tree shows the folder the document lives in. A document that has
-    // not been saved yet has no folder of its own, so the model falls back to
-    // where Omawrite last saved something.
+    // The tree is rooted once and stays there while the writer moves around
+    // inside it, so opening a file in a subfolder never takes the root away.
+    // Reopening the tree follows the document only when it lives somewhere
+    // else now.
     function toggleFileTree() {
         if (win.fileTreeOpen) {
             win.closeFileTree();
             return;
         }
-        backend.fileTree.setDocument(backend.fileUrl);
+        if (!backend.fileTree.containsDocument(backend.fileUrl))
+            backend.fileTree.setDocument(backend.fileUrl);
         win.fileTreeOpen = true;
         fileTreePanel.revealCurrent();
         fileTreePanel.focusList();
@@ -355,12 +357,6 @@ ApplicationWindow {
             externalChangeDialog.locallyModified = locallyModified;
             externalChangeDialog.open();
         }
-
-        // Opening a file elsewhere moves the tree to that folder.
-        function onFileUrlChanged() {
-            if (win.fileTreeOpen)
-                backend.fileTree.setDocument(backend.fileUrl);
-        }
     }
 
     Dialogs.FileDialog {
@@ -460,7 +456,9 @@ ApplicationWindow {
 
             onFileActivated: function(fileUrl) {
                 win.requestOpen(fileUrl);
-                win.closeFileTree();
+                // The tree stays open and rooted where it is, so another
+                // file is always one click away.
+                editor.forceActiveFocus();
             }
             onCloseRequested: win.closeFileTree()
         }

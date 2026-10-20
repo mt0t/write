@@ -21,6 +21,8 @@ Install via the Omarchy Package Repository via the `omawrite` package. It's inst
 - `Ctrl+Shift+S` saves as.
 - `Ctrl+O` opens a Markdown file through the portal picker.
 - `Ctrl+Shift+E` toggles the file tree, showing the Markdown files in the document's folder.
+  It stays rooted where it was opened while a file in a subfolder is written, and
+  the house button in its header closes every folder back to the root.
 - `Ctrl+P` opens the system print dialog.
 - `Ctrl+N` opens a new Omawrite window.
 - `Ctrl+Z`, `Ctrl+Shift+Z`, and `Ctrl+Y` handle undo and redo.

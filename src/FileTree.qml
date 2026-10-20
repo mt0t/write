@@ -54,6 +54,16 @@ Rectangle {
         list.forceActiveFocus();
     }
 
+    // Back to the folder the tree started in: close every folder that was
+    // opened underneath it and put the first row back under the eye.
+    function backToRoot() {
+        if (treeModel)
+            treeModel.collapseAll();
+        list.currentIndex = list.count > 0 ? 0 : -1;
+        list.contentY = 0;
+        list.forceActiveFocus();
+    }
+
     function activateRow(row) {
         var item = entry(row);
         if (item.isDir === undefined)
@@ -100,7 +110,7 @@ Rectangle {
 
         Label {
             anchors.left: parent.left
-            anchors.right: closeButton.left
+            anchors.right: rootButton.left
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: root.scaled(6)
             text: root.rootName
@@ -109,6 +119,34 @@ Rectangle {
             font.pixelSize: root.scaled(12)
             font.bold: true
             elide: Text.ElideRight
+        }
+
+        Item {
+            id: rootButton
+            anchors.right: closeButton.left
+            anchors.rightMargin: root.scaled(2)
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.scaled(22)
+            height: root.scaled(22)
+
+            Label {
+                anchors.centerIn: parent
+                text: "\u2302"
+                color: rootArea.containsMouse ? root.textColor : root.mutedColor
+                font.family: "IBM Plex Mono"
+                font.pixelSize: root.scaled(14)
+            }
+
+            MouseArea {
+                id: rootArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.backToRoot()
+            }
+
+            ToolTip.visible: rootArea.containsMouse
+            ToolTip.text: "Back to root"
         }
 
         Item {

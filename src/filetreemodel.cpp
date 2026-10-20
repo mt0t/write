@@ -226,6 +226,36 @@ int FileTreeModel::parentRow(int row) const {
     return -1;
 }
 
+void FileTreeModel::collapseAll() {
+    if (m_expanded.isEmpty())
+        return;
+
+    beginResetModel();
+    m_expanded.clear();
+    m_rows = buildRows();
+    endResetModel();
+    watchDirectories();
+}
+
+bool FileTreeModel::containsDocument(const QUrl &documentUrl) const {
+    if (m_rootPath.isEmpty())
+        return false;
+    // A document that has never been saved has no folder of its own, so it
+    // must not move a tree that is already open.
+    if (!documentUrl.isLocalFile())
+        return true;
+
+    const QFileInfo info(documentUrl.toLocalFile());
+    const QString directory = QDir::cleanPath(
+        info.isDir() ? info.absoluteFilePath() : info.absolutePath());
+    if (directory == m_rootPath)
+        return true;
+
+    const QString prefix = m_rootPath.endsWith(QLatin1Char('/'))
+        ? m_rootPath : m_rootPath + QLatin1Char('/');
+    return directory.startsWith(prefix);
+}
+
 // Markdown is what Omawrite writes; plain text is what it can also read.
 // Everything else beside the document would only get in the way.
 bool FileTreeModel::markdownFile(const QString &fileName) {
