@@ -12,6 +12,8 @@
 #include <QVariantList>
 #include <memory>
 
+#include "filetreemodel.h"
+
 class MarkdownHighlighter;
 class QFont;
 class QTextDocument;
@@ -34,6 +36,9 @@ class Backend : public QObject {
     Q_PROPERTY(QString themeSelectionForeground READ themeSelectionForeground NOTIFY themeColorsChanged)
     Q_PROPERTY(QString editorFont READ editorFont WRITE setEditorFont NOTIFY editorFontChanged)
     Q_PROPERTY(QStringList availableFonts READ availableFonts CONSTANT)
+    // The files beside the document, for the tree the writer can pull in
+    // from the left edge of the window.
+    Q_PROPERTY(QObject *fileTree READ fileTree CONSTANT)
 
 public:
     explicit Backend(QObject *parent = nullptr);
@@ -61,6 +66,7 @@ public:
     QString editorFont() const { return m_editorFont; }
     void setEditorFont(const QString &family);
     QStringList availableFonts() const;
+    QObject *fileTree() { return &m_fileTree; }
     static QString defaultEditorFont();
     static QStringList selectableFontFamilies(const QStringList &families);
     static int countWords(const QString &text);
@@ -194,6 +200,7 @@ private:
     QString m_themeCodeBackground;
     QString m_themeSelectionForeground;
     QString m_editorFont;
+    FileTreeModel m_fileTree;
     QFileSystemWatcher m_themeWatcher;
     QTimer m_themeReloadTimer;
 };

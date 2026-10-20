@@ -18,6 +18,7 @@ Dialog {
         { key: "Ctrl+S", desc: "Save" },
         { key: "Ctrl+Shift+S", desc: "Save As" },
         { key: "Ctrl+O", desc: "Open" },
+        { key: "Ctrl+Shift+E", desc: "Toggle File Tree" },
         { key: "Ctrl+N", desc: "New Window" },
         { key: "Ctrl+P", desc: "Print" },
         { key: "Ctrl+Z", desc: "Undo" },

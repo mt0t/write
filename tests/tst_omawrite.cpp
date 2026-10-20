@@ -21,6 +21,7 @@
 #include "cli.h"
 
 #include "backend.h"
+#include "filetreemodel.h"
 #include "markdownhighlighter.h"
 
 // Counts QML "Binding loop detected" warnings while it is alive, forwarding
@@ -231,6 +232,118 @@ private slots:
         QSettings().setValue(QStringLiteral("editor/font"), QStringLiteral("No Such Font"));
         QCOMPARE(Backend().editorFont(), Backend::defaultEditorFont());
         QSettings().remove(QStringLiteral("editor/font"));
+    }
+
+    void listsMarkdownBesideTheDocument() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QDir root(directory.path());
+        QVERIFY(root.mkdir("notes"));
+        QVERIFY(root.mkdir("notes/deep"));
+        writeFile(root.filePath("alpha.markdown"), "# alpha");
+        writeFile(root.filePath("zeta.md"), "# zeta");
+        writeFile(root.filePath("readme.txt"), "text");
+        // Neither a picture nor a hidden file belongs in the tree.
+        writeFile(root.filePath("photo.png"), "png");
+        writeFile(root.filePath(".hidden.md"), "hidden");
+        writeFile(root.filePath("notes/nested.md"), "nested");
+        writeFile(root.filePath("notes/deep/inner.md"), "inner");
+
+        FileTreeModel tree;
+        tree.setRootPath(directory.path());
+
+        QCOMPARE(tree.rowCount(), 4);
+        QCOMPARE(tree.rootName(), root.dirName());
+
+        // Folders first, then files, each folded case-insensitively.
+        QCOMPARE(tree.entry(0).value("name").toString(), QStringLiteral("notes"));
+        QVERIFY(tree.entry(0).value("isDir").toBool());
+        QCOMPARE(tree.entry(0).value("depth").toInt(), 0);
+        QVERIFY(!tree.entry(0).value("expanded").toBool());
+        QCOMPARE(tree.entry(1).value("name").toString(), QStringLiteral("alpha.markdown"));
+        QCOMPARE(tree.entry(2).value("name").toString(), QStringLiteral("readme.txt"));
+        QCOMPARE(tree.entry(3).value("name").toString(), QStringLiteral("zeta.md"));
+
+        // A folder starts closed and opens in place.
+        tree.toggle(0);
+        QCOMPARE(tree.rowCount(), 6);
+        QVERIFY(tree.entry(0).value("expanded").toBool());
+        QCOMPARE(tree.entry(1).value("name").toString(), QStringLiteral("deep"));
+        QCOMPARE(tree.entry(1).value("depth").toInt(), 1);
+        QCOMPARE(tree.entry(2).value("name").toString(), QStringLiteral("nested.md"));
+        QCOMPARE(tree.parentRow(2), 0);
+        QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(root.filePath("notes/nested.md"))), 2);
+
+        // Folders nested under it open the same way.
+        tree.toggle(1);
+        QCOMPARE(tree.rowCount(), 7);
+        QCOMPARE(tree.entry(2).value("name").toString(), QStringLiteral("inner.md"));
+        QCOMPARE(tree.entry(2).value("depth").toInt(), 2);
+        QCOMPARE(tree.parentRow(2), 1);
+
+        // Closing a folder takes everything underneath it along.
+        tree.toggle(0);
+        QCOMPARE(tree.rowCount(), 4);
+        QVERIFY(!tree.entry(0).value("expanded").toBool());
+    }
+
+    void rootsTheTreeAtTheOpenDocument() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QDir root(directory.path());
+        QVERIFY(root.mkdir("writing"));
+        const QString document = root.filePath("writing/note.md");
+        writeFile(document, "# note");
+
+        FileTreeModel tree;
+        tree.setDocument(QUrl::fromLocalFile(document));
+        QCOMPARE(tree.rootPath(), QFileInfo(document).absolutePath());
+        QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(document)), 0);
+        QCOMPARE(tree.rowForUrl(QUrl::fromLocalFile(root.filePath("writing/missing.md"))), -1);
+    }
+
+    void togglesTheFileTreeWithItsShortcut() {
+        const QString mainQmlPath = QFINDTESTDATA("../src/Main.qml");
+        QVERIFY(!mainQmlPath.isEmpty());
+
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QDir root(directory.path());
+        QVERIFY(root.mkdir("notes"));
+        writeFile(root.filePath("note.md"), "# note");
+        writeFile(root.filePath("other.md"), "# other");
+        writeFile(root.filePath("notes/inner.md"), "# inner");
+        writeFile(root.filePath("photo.png"), "png");
+
+        Backend backend;
+        backend.open(QUrl::fromLocalFile(root.filePath("note.md")));
+
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(mainQmlPath));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> object(component.create());
+        auto *window = qobject_cast<QQuickWindow *>(object.data());
+        QVERIFY(window);
+        window->show();
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+
+        QObject *panel = window->findChild<QObject *>(QStringLiteral("fileTreePanel"));
+        QVERIFY(panel);
+        QVERIFY(!panel->property("visible").toBool());
+
+        QTest::keyClick(window, Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        QVERIFY(panel->property("visible").toBool());
+
+        auto *tree = static_cast<FileTreeModel *>(backend.fileTree());
+        QCOMPARE(tree->rootPath(), root.absolutePath());
+        // The folder, then its Markdown files; the picture stays out.
+        QCOMPARE(tree->rowCount(), 3);
+        QCOMPARE(tree->entry(0).value("name").toString(), QStringLiteral("notes"));
+        QCOMPARE(tree->rowForUrl(QUrl::fromLocalFile(root.filePath("note.md"))), 1);
+
+        QTest::keyClick(window, Qt::Key_E, Qt::ControlModifier | Qt::ShiftModifier);
+        QVERIFY(!panel->property("visible").toBool());
     }
 
     void findsStrikethroughOutsideCode() {

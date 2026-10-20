@@ -7,6 +7,7 @@ TEMPLATE = app
 HEADERS += \
     src/backend.h \
     src/cli.h \
+    src/filetreemodel.h \
     src/markdownhighlighter.h \
     src/systemtheme.h
 
@@ -14,6 +15,7 @@ SOURCES += \
     src/main.cpp \
     src/backend.cpp \
     src/cli.cpp \
+    src/filetreemodel.cpp \
     src/markdownhighlighter.cpp \
     src/systemtheme.cpp
 

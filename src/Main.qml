@@ -28,13 +28,17 @@ ApplicationWindow {
     readonly property real textScale: backend.textScale
     readonly property int editorFontPixelSize: scaledSize(20)
     readonly property int footerHeight: scaledSize(32)
+    readonly property int fileTreeWidth: Math.min(
+        Math.round(260 * textScale), Math.round(width * 0.42))
     // Never wider than the Flickable's viewport, whatever the floor asks for:
     // a tiling compositor can resize the window below its minimum width.
     readonly property int editorWidth: Math.min(
         Math.round(writerFontMetrics.averageCharacterWidth * 65),
-        Math.max(360, width - Math.round(writerFontMetrics.averageCharacterWidth * 20)),
-        Math.max(0, width - 48))
+        Math.max(360, width - Math.round(writerFontMetrics.averageCharacterWidth * 20)
+                 - (fileTreeOpen ? fileTreeWidth : 0)),
+        Math.max(0, width - 48 - (fileTreeOpen ? fileTreeWidth : 0)))
     property bool closeConfirmed: false
+    property bool fileTreeOpen: false
     property bool searchOpen: false
     property bool searchUpdating: false
     property var searchMatches: []
@@ -94,6 +98,26 @@ ApplicationWindow {
         win.visibility = win.visibility === Window.FullScreen
             ? Window.Windowed
             : Window.FullScreen;
+    }
+
+    // The tree shows the folder the document lives in. A document that has
+    // not been saved yet has no folder of its own, so the model falls back to
+    // where Omawrite last saved something.
+    function toggleFileTree() {
+        if (win.fileTreeOpen) {
+            win.closeFileTree();
+            return;
+        }
+        backend.fileTree.setDocument(backend.fileUrl);
+        win.fileTreeOpen = true;
+        fileTreePanel.revealCurrent();
+        fileTreePanel.focusList();
+    }
+
+    function closeFileTree() {
+        win.fileTreeOpen = false;
+        Qt.inputMethod.reset();
+        editor.forceActiveFocus();
     }
 
     // Only the search field and the next and previous controls select a
@@ -241,6 +265,11 @@ ApplicationWindow {
     }
 
     Shortcut {
+        sequence: "Ctrl+Shift+E"
+        onActivated: win.toggleFileTree()
+    }
+
+    Shortcut {
         sequence: "Ctrl+O"
         onActivated: backend.openDialog()
     }
@@ -326,6 +355,12 @@ ApplicationWindow {
             externalChangeDialog.locallyModified = locallyModified;
             externalChangeDialog.open();
         }
+
+        // Opening a file elsewhere moves the tree to that folder.
+        function onFileUrlChanged() {
+            if (win.fileTreeOpen)
+                backend.fileTree.setDocument(backend.fileUrl);
+        }
     }
 
     Dialogs.FileDialog {
@@ -404,11 +439,37 @@ ApplicationWindow {
     Item {
         anchors.fill: parent
 
+        FileTree {
+            id: fileTreePanel
+            objectName: "fileTreePanel"
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            width: win.fileTreeWidth
+            visible: win.fileTreeOpen
+            z: 5
+            treeModel: backend.fileTree
+            rootName: backend.fileTree.rootName
+            currentUrl: backend.fileUrl
+            darkMode: win.darkMode
+            textScale: win.textScale
+            pageColor: win.pageColor
+            textColor: win.textColor
+            mutedColor: win.mutedColor
+            accentColor: backend.themeAccent
+
+            onFileActivated: function(fileUrl) {
+                win.requestOpen(fileUrl);
+                win.closeFileTree();
+            }
+            onCloseRequested: win.closeFileTree()
+        }
+
         Flickable {
             id: editorFlick
             objectName: "editorScroll"
             anchors.fill: parent
-            anchors.leftMargin: 24
+            anchors.leftMargin: 24 + (win.fileTreeOpen ? win.fileTreeWidth : 0)
             anchors.rightMargin: 24
             // Inset the scrolling area by the footer strip at both ends, so
             // scrolled text never runs under the footer buttons, status, or
@@ -1054,7 +1115,7 @@ ApplicationWindow {
             id: footerStatus
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 12
+            anchors.leftMargin: 12 + (win.fileTreeOpen ? win.fileTreeWidth : 0)
             anchors.bottomMargin: 10
             spacing: 12
             opacity: 0.55
@@ -1073,6 +1134,14 @@ ApplicationWindow {
                 iconColor: win.mutedColor
                 tooltip: "Open"
                 onClicked: backend.openDialog()
+            }
+
+            FooterIconButton {
+                objectName: "fileTreeButton"
+                iconName: "tree"
+                iconColor: win.mutedColor
+                tooltip: "Files (Ctrl+Shift+E)"
+                onClicked: win.toggleFileTree()
             }
 
             FooterIconButton {
@@ -1137,7 +1206,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.topMargin: 12
-            anchors.leftMargin: 12
+            anchors.leftMargin: 12 + (win.fileTreeOpen ? win.fileTreeWidth : 0)
             anchors.rightMargin: 12
             height: win.scaledSize(win.replaceOpen ? 104 : 56)
             visible: win.searchOpen
